@@ -22,6 +22,23 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.json()); // lets us read JSON bodies from POST/PUT/PATCH
 
+// If the request body is invalid JSON (a missing comma, mismatched quote,
+// stray bracket, etc.), express.json() throws instead of just leaving an
+// empty body. Without this handler, that crash falls through to Express's
+// default error page — an unhelpful "Internal Server Error" screen with no
+// explanation. This catches that specific case and returns a clear,
+// friendly message instead, so students immediately know their JSON has a
+// typo rather than assuming the server itself is broken.
+app.use((err, req, res, next) => {
+  if (err.type === "entity.parse.failed" || err instanceof SyntaxError) {
+    return res.status(400).json({
+      error:
+        "Your request body isn't valid JSON. Check for a missing comma, an extra/missing quote, or a stray bracket, then try again.",
+    });
+  }
+  next(err);
+});
+
 // In-memory "database"
 let students = [];
 let nextId = 1;
@@ -44,7 +61,7 @@ function missingFields(body) {
 // POST /students — submit a new student profile
 // ---------------------------------------------------------
 app.post("/students", (req, res) => {
-  const missing = missingFields(req.body);
+  const missing = missingFields(req.body || {});
 
   if (missing.length > 0) {
     return res.status(400).json({
@@ -54,7 +71,7 @@ app.post("/students", (req, res) => {
     });
   }
 
-  const { firstName, middleName, lastName, age, course, year, motto } = req.body;
+  const { firstName, middleName, lastName, age, course, year, motto } = req.body || {};
 
   const newStudent = {
     id: nextId++,
@@ -105,7 +122,7 @@ app.put("/students/:id", (req, res) => {
     return res.status(404).json({ error: `Student ${req.params.id} not found.` });
   }
 
-  const missing = missingFields(req.body);
+  const missing = missingFields(req.body || {});
 
   if (missing.length > 0) {
     return res.status(400).json({
@@ -115,7 +132,7 @@ app.put("/students/:id", (req, res) => {
     });
   }
 
-  const { firstName, middleName, lastName, age, course, year, motto } = req.body;
+  const { firstName, middleName, lastName, age, course, year, motto } = req.body || {};
 
   student.firstName = firstName;
   student.middleName = middleName || "";
@@ -142,7 +159,7 @@ app.patch("/students/:id", (req, res) => {
   }
 
   const allowedFields = ["firstName", "middleName", "lastName", "age", "course", "year", "motto"];
-  const receivedFields = Object.keys(req.body);
+  const receivedFields = Object.keys(req.body || {});
   const unknownFields = receivedFields.filter((f) => !allowedFields.includes(f));
 
   if (receivedFields.length === 0) {
@@ -160,8 +177,8 @@ app.patch("/students/:id", (req, res) => {
   }
 
   allowedFields.forEach((field) => {
-    if (req.body[field] !== undefined) {
-      student[field] = req.body[field];
+    if ((req.body || {})[field] !== undefined) {
+      student[field] = (req.body || {})[field];
     }
   });
   student.updatedAt = new Date().toISOString();
@@ -191,6 +208,17 @@ app.get("/", (req, res) => {
   res.send(
     "Student Info API is running. Try POST /students to submit a profile, then GET /students to see it!"
   );
+});
+
+// ---------------------------------------------------------
+// Catch-all error handler — must be registered AFTER all routes above.
+// Any error not already handled (e.g. an unexpected bug) lands here
+// instead of Express's default HTML "Internal Server Error" page, so
+// students always get a readable JSON response.
+// ---------------------------------------------------------
+app.use((err, req, res, next) => {
+  console.error(err);
+  res.status(500).json({ error: "Something unexpected went wrong on the server." });
 });
 
 app.listen(PORT, () => {
