@@ -1,0 +1,14 @@
+{
+  "name": "messages-api",
+  "version": "1.0.0",
+  "description": "Tiny practice API for ITEC111 — send a message with POST, retrieve it with GET, update it with PUT/PATCH.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^5.2.1"
+  }
+}
